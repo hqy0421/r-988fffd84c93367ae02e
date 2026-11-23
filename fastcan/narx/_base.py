@@ -1223,6 +1223,52 @@ class NARX(MultiOutputMixin, RegressorMixin, BaseEstimator):
             y_hat = y_hat.flatten()
         return y_hat
 
+    def init_predictor(self, y_init=None):
+        """Create a stateful predictor for batch-wise (streaming) prediction.
+
+        The returned :class:`~fastcan.narx.NARXPredictor` carries the
+        recursion state across consecutive batches: the tail of one
+        prediction is automatically consumed as the initial condition of the
+        next batch. Predicting a sequence batch by batch through one
+        predictor therefore gives the same result as predicting it all at
+        once with :meth:`predict`.
+
+        Use one predictor per data source (e.g. per production line); each
+        predictor keeps an independent state, so interleaved requests do not
+        interfere. On a line change, call the predictor's
+        :meth:`~fastcan.narx.NARXPredictor.reset` method with the new
+        initial conditions.
+
+        Parameters
+        ----------
+        y_init : array-like of shape (n_init,) or (n_init, `n_outputs_`), \
+                default=None
+            The initial values of the output for the prediction session.
+            It should at least have one sample. If None, zeros are used.
+
+        Returns
+        -------
+        predictor : NARXPredictor
+            A stateful predictor bound to this fitted NARX model.
+
+        Examples
+        --------
+        >>> import numpy as np
+        >>> from fastcan.narx import NARX
+        >>> rng = np.random.default_rng(12345)
+        >>> X = rng.random((20, 1))
+        >>> y = rng.random(20)
+        >>> narx = NARX().fit(X, y)
+        >>> predictor = narx.init_predictor(y_init=y[: narx.max_delay_])
+        >>> y_batches = np.r_[
+        ...     predictor.predict(X[:10]),
+        ...     predictor.predict(X[10:]),
+        ... ]
+        """
+        from ._predictor import NARXPredictor
+
+        return NARXPredictor(self, y_init=y_init)
+
     def __sklearn_tags__(self):
         tags = super().__sklearn_tags__()
         tags.input_tags.allow_nan = True

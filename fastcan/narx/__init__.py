@@ -16,6 +16,7 @@ from ._feature import (
     make_time_shift_ids,
     tp2fd,
 )
+from ._predictor import NARXPredictor
 from ._utils import (
     make_narx,
     print_narx,
@@ -23,6 +24,7 @@ from ._utils import (
 
 __all__ = [
     "NARX",
+    "NARXPredictor",
     "fd2tp",
     "gen_poly_features",
     "gen_time_shift_features",

@@ -84,6 +84,42 @@ In system identification, two types of predictions can be made by NARX models:
 Obviously, the multiple-step-ahead prediction is more challenging, because the predicted output is used as the input to predict the output at the next step, which may accumulate the error.
 The `prediction` method of :class:`NARX` gives the multiple-step-ahead prediction.
 
+Stateful batch-wise prediction
+------------------------------
+
+:meth:`NARX.predict` is stateless: every call restarts the recursion from the
+given `y_init`. In streaming applications, however, data often arrive in
+batches, e.g. a factory forecasts the outlet temperature shift by shift, and
+the tail of one shift must be carried over as the initial condition of the
+next shift.
+
+The :class:`NARXPredictor` class (or equivalently the
+:meth:`NARX.init_predictor` method) keeps this recursion state for one
+measurement session. It stores the last ``max_delay_`` input samples and
+predicted outputs, so consecutive :meth:`~NARXPredictor.predict` calls chain
+together. Predicting a sequence batch by batch through one predictor therefore
+returns exactly the same values as predicting the whole sequence at once with
+:meth:`NARX.predict`:
+
+.. code-block:: python
+
+    predictor = narx.init_predictor(y_init=y[: narx.max_delay_])
+    y_hat = np.r_[
+        predictor.predict(X[:100]),   # first shift
+        predictor.predict(X[100:200]),  # continues from the previous tail
+    ]
+    assert np.array_equal(y_hat, narx.predict(X, y_init=y[: narx.max_delay_]))
+
+Each predictor holds an independent state, so different data sources, e.g.
+different production lines, should use separate predictors; interleaved
+requests on two predictors never contaminate each other. On a line change,
+where the recursion must start from new initial conditions instead of the
+previous session's tail, call :meth:`NARXPredictor.reset`:
+
+.. code-block:: python
+
+    predictor.reset(y_init=new_y_init)  # new line, new initial conditions
+
 It should also be noted the different types of predictions in model training.
 
 #. If assume the NARX model is one-step-ahead prediction structure, we know all input data for training in advance,
